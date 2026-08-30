@@ -1,0 +1,24 @@
+<Project>
+
+  <!--
+    The client project writes its assemblies straight into build/<ResourceName>/client. The
+    manifest is not built by anything, so it is copied here instead, which is what turns that
+    folder into a resource you can drop on a server.
+  -->
+  <ItemGroup Condition="'$(IsResourceRootProject)' == 'true'">
+    <ResourceRootFile Include="$(MSBuildThisFileDirectory)fxmanifest.lua" />
+    <ResourceRootFile Include="$(MSBuildThisFileDirectory)README.md" />
+  </ItemGroup>
+
+  <Target Name="CopyResourceRootFiles"
+          AfterTargets="Build"
+          Condition="'$(IsResourceRootProject)' == 'true'">
+
+    <Copy SourceFiles="@(ResourceRootFile)"
+          DestinationFolder="$(ResourceRoot)"
+          SkipUnchangedFiles="true" />
+
+    <Message Importance="high" Text="Resource ready: $(ResourceRoot)" />
+  </Target>
+
+</Project>
