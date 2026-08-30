@@ -1,42 +1,20 @@
 # vMenu Theme Picker
 
-A small plugin for [vMenu Enhanced](https://github.com/TomGrobbe/vMenu) that lets a player choose the look of their own vMenu menus, from inside vMenu itself.
+A plugin for [vMenu Enhanced](https://github.com/TomGrobbe/vMenu) that lets every player pick the theme they see, instead of the one the server picked. Their choice is saved on their own computer and comes back next time. No permissions, no settings.
 
-vMenu ships a few themes: the default soft dark glass look, a solid dark one, a bright cartoon one, and the plain GTA V style. Normally the server owner picks one for everybody with a convar. This plugin adds a Theme Picker row to vMenu's Plugins menu with a button for every theme vMenu knows about, and pressing one switches the menus over straight away.
+## Installing
 
-**The choice belongs to the player, and it is remembered.** It is saved on that player's own computer, in this resource's key value store, so their theme comes back the next time they play, and it follows them to any server running this plugin. Nothing about it reaches the server, and no other player sees it. There is one more row, Use the server's theme, which forgets the choice and puts the server's own theme back. It stays greyed out until you have actually picked a theme yourself, because before that there is nothing to undo.
+Take the zip from [the latest release](https://github.com/TomGrobbe/vMenu.ThemePicker/releases/latest), put the `vMenu.ThemePicker` folder in your server's `resources`, and add `ensure vMenu.ThemePicker` to your server config. Start order does not matter.
 
-There are no permissions and no settings. Anyone who can open vMenu can change how their own menus look, which is the point: it changes nothing but what that one player sees.
+In game it sits under vMenu's Plugins menu, one row per theme plus one to go back to the server's theme.
 
-## Building it
+## Building it yourself
 
-You need the .NET 10 SDK. From this folder:
+.NET 10 SDK, then `dotnet build -c Release`. The resource lands in `build/vMenu.ThemePicker/`.
 
-```
-dotnet build -c Release
-```
+It builds against the `vMenu.Enhanced.ClientAPI` package pinned in `Directory.Packages.props`, so keep that in step with the vMenu your server runs. Against a vMenu older than `0.0.1-alpha.92` it starts fine but finds no themes, since that vMenu cannot send them.
 
-The finished resource lands in `build/vMenu.ThemePicker/`. Copy that whole folder into your server's `resources`, then add `ensure vMenu.ThemePicker` to your server config. It has to start alongside vMenu, in either order: the plugin waits for vMenu and registers itself again if vMenu restarts.
-
-## The package it builds against
-
-The plugin talks to vMenu through the `vMenu.Enhanced.ClientAPI` NuGet package, pinned in `Directory.Packages.props` to `0.0.1-alpha.92`, which is the first vMenu Enhanced release whose plugin API can list and set themes.
-
-Keep that pin in step with the vMenu your server actually runs. If you move vMenu to a newer release, raise the version here too, and if your server still runs something older than `0.0.1-alpha.92`, this plugin will register fine but find no themes to offer, because that vMenu does not know how to send them.
-
-## How it works
-
-The whole plugin is one file, `client/Main.cs`, and the interesting part is short:
-
-```csharp
-_plugin.Themes.Changed += Sync;
-```
-
-vMenu sends the theme list to a plugin right after it registers, and again every time the theme changes, whoever changed it. So the rows are built from that event rather than up front, and the Current label moves on its own when something else changes the theme, including the server owner editing the convar while you play.
-
-vMenu itself never saves a theme, that is this plugin's job. It writes the chosen id with `SetResourceKvp` and puts it back on the first theme list it gets, once per vMenu run. A saved theme that no resource provides right now is left alone rather than dropped, so a theme pack starting a moment later still lands.
-
-Picking a theme is `_plugin.Themes.Set(id)`, and going back to the server's choice is `_plugin.Themes.Reset()`.
+Want more themes than the four vMenu ships with? See the [Custom Themes plugin](https://github.com/TomGrobbe/vMenu.CustomThemesPlugin).
 
 ## License
 

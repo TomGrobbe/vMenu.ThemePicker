@@ -158,9 +158,8 @@ public sealed class Main : IScript
 
         return true;
     }
-
-    // Every language needs the same keys, and English is the one vMenu falls back to when the
-    // player's language has no table here.
+    
+    // Only Dutch and Enlgish for now, any other languages fall back on English.
     private static void AddTranslations(VMenuPlugin plugin)
     {
         plugin.Translations.Add("en", new Dictionary<string, string>
