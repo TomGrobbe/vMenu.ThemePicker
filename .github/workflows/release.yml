@@ -1,0 +1,113 @@
+# Builds the resource and publishes it as a GitHub release, on every push to main.
+#
+# The version is 1.0.<run number>, so every push is a new release, tagged v1.0.<run number>
+# and marked as the latest one. There is no draft step and nothing else to press.
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A newer push makes an older run pointless, so it is cancelled rather than racing to release.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The changelog reads the log back to the previous tag, which needs the whole history.
+          fetch-depth: 0
+
+      - name: Set version
+        id: version
+        shell: bash
+        run: |
+          VERSION="1.0.${{ github.run_number }}"
+          {
+            echo "version=$VERSION"
+            echo "tag=v$VERSION"
+            echo "zip=vMenu.ThemePicker-v$VERSION.zip"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # Written into the manifest so a server owner can see which build they are running. No end of
+      # line anchor: this repository checks out with CRLF, so every line ends in a carriage return.
+      - name: Stamp the manifest
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          sed -i "s/^version '[^']*'/version '$VERSION'/" fxmanifest.lua
+
+          grep -q "^version '$VERSION'" fxmanifest.lua || {
+            echo "The version line in fxmanifest.lua was not replaced."
+            exit 1
+          }
+
+      - name: Build
+        shell: bash
+        run: |
+          dotnet build -c Release \
+            -p:Version="${{ steps.version.outputs.version }}" \
+            -p:AssemblyVersion="${{ steps.version.outputs.version }}.0" \
+            -p:FileVersion="${{ steps.version.outputs.version }}.0"
+
+      # The zip holds the resource folder itself, so it unpacks straight into a resources folder.
+      - name: Package
+        shell: bash
+        run: |
+          cd build
+          zip -r "../${{ steps.version.outputs.zip }}" vMenu.ThemePicker
+          cd ..
+          unzip -l "${{ steps.version.outputs.zip }}"
+
+      - name: Generate changelog
+        shell: bash
+        run: |
+          LAST_TAG=$(git tag --sort=-version:refname | grep '^v' | head -n 1 || true)
+
+          if [ -n "$LAST_TAG" ]; then
+            git log "$LAST_TAG..HEAD" --pretty=format:'- `%h` (%an) %s' > changelog.txt
+          else
+            git log --pretty=format:'- `%h` (%an) %s' > changelog.txt
+          fi
+
+          echo "Changelog since: ${LAST_TAG:-<beginning>}"
+          cat changelog.txt
+
+      - name: Create the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          {
+            echo "Drop the \`vMenu.ThemePicker\` folder from the zip into your server's resources, then \`ensure vMenu.ThemePicker\`."
+            echo ""
+            echo "Needs vMenu Enhanced with theme support, and the plugin API package it is built against is pinned in \`Directory.Packages.props\`."
+            echo ""
+            echo "### Changes"
+            echo ""
+            cat changelog.txt
+          } > release_notes.md
+
+          gh release create "${{ steps.version.outputs.tag }}" \
+            --title "vMenu Theme Picker v${{ steps.version.outputs.version }}" \
+            --notes-file release_notes.md \
+            --latest \
+            --target "$GITHUB_SHA" \
+            "${{ steps.version.outputs.zip }}"

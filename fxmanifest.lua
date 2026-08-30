@@ -8,8 +8,12 @@ fx_version 'cerulean'
 games { 'gta5' }
 
 name 'vMenu Theme Picker'
-description 'Lets a player pick the vMenu theme they see, for the rest of their session.'
+description 'Lets a player pick the vMenu theme they see, remembered on their own computer.'
 author 'Tom Grobbe'
+url 'https://github.com/TomGrobbe/vMenu.ThemePicker'
+
+-- Replaced by the release workflow with the version it is building.
+version '0.0.0'
 
 -- Everything the client half needs, because a client assembly and its dependencies are
 -- downloaded rather than read off the server's disk. Add a line here for every DLL that
