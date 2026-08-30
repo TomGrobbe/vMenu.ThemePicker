@@ -18,8 +18,6 @@ public sealed class Main : IScript
 
     private PluginButton? _reset;
 
-    private bool _restored;
-
     public async void Initialize()
     {
         _plugin = VMenuPlugin.Create(Text.Key("themes.name"));
@@ -34,8 +32,9 @@ public sealed class Main : IScript
         // again on every theme change, so nothing is added before the list exists.
         _plugin.Themes.Changed += Sync;
 
-        // vMenu forgets an override when it restarts, so the saved theme is put back on the next one.
-        _plugin.Disconnected += () => _restored = false;
+        // The theme list can land before vMenu has answered the registration, and a send made then is
+        // dropped. Answering again here means the saved theme still gets its chance.
+        _plugin.RegistrationAnswered += _ => Restore();
 
         var result = await _plugin.ConnectAsync();
 
@@ -51,7 +50,7 @@ public sealed class Main : IScript
             Rebuild(themes);
         }
 
-        Restore(themes);
+        Restore();
 
         foreach (var theme in themes)
         {
@@ -98,8 +97,6 @@ public sealed class Main : IScript
 
     private void Pick(string id)
     {
-        _restored = true;
-
         Native.SetResourceKvp(SavedThemeKey, id);
 
         _plugin.Themes.Set(id);
@@ -107,35 +104,41 @@ public sealed class Main : IScript
 
     private void Forget()
     {
-        _restored = true;
-
         Native.DeleteResourceKvp(SavedThemeKey);
 
         _plugin.Themes.Reset();
     }
 
-    // Once per vMenu, and only while the saved theme is one vMenu currently offers: the resource that
-    // provides it may still be starting, and then it lands on a later list.
-    private void Restore(IReadOnlyList<PluginTheme> themes)
+    // Tried again on every list and every registration answer rather than once, because the moment the
+    // saved theme can be applied is not knowable up front: the resource providing it may still be
+    // starting, and vMenu forgets the theme it was told when it restarts.
+    private void Restore()
     {
-        if (_restored || Native.GetResourceKvpString(SavedThemeKey) is not { Length: > 0 } saved)
+        var themes = _plugin.Themes;
+
+        // Nothing is overriding means either nobody asked yet, or vMenu restarted and forgot. Somebody
+        // else's override is left alone.
+        if (!_plugin.IsConnected || themes.IsOverridden)
         {
             return;
         }
 
-        foreach (var theme in themes)
+        if (Native.GetResourceKvpString(SavedThemeKey) is not { Length: > 0 } saved
+            || string.Equals(saved, themes.CurrentId, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        foreach (var theme in themes.Available)
         {
             if (!string.Equals(theme.Id, saved, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            _restored = true;
+            API.Log.Info($"[ThemePicker] Putting the saved theme '{theme.Id}' back.");
 
-            if (!theme.IsCurrent)
-            {
-                _plugin.Themes.Set(theme.Id);
-            }
+            themes.Set(theme.Id);
 
             return;
         }
