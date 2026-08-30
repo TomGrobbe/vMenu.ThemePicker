@@ -9,8 +9,8 @@
       it when you update vMenu. Pinned rather than floating: a plugin that silently follows the
       newest package is a plugin that breaks on a vMenu release nobody tested it against.
 
-      0.0.1-alpha.92 is the first release whose API can list and set themes.
+      Themes arrived in 0.0.1-alpha.92, which is the oldest release this plugin works against.
     -->
-    <PackageVersion Include="vMenu.Enhanced.ClientAPI" Version="0.0.1-alpha.92" />
+    <PackageVersion Include="vMenu.Enhanced.ClientAPI" Version="0.0.1-alpha.94" />
   </ItemGroup>
 </Project>
