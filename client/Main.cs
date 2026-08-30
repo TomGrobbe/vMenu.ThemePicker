@@ -7,6 +7,9 @@ namespace ThemePicker.Client;
 
 public sealed class Main : IScript
 {
+    // Lives in this resource's own key value store on the player's computer, never on the server.
+    private const string SavedThemeKey = "theme";
+
     private readonly Dictionary<string, PluginButton> _buttons = new(StringComparer.OrdinalIgnoreCase);
 
     private readonly List<string> _built = new();
@@ -14,6 +17,8 @@ public sealed class Main : IScript
     private VMenuPlugin _plugin = null!;
 
     private PluginButton? _reset;
+
+    private bool _restored;
 
     public async void Initialize()
     {
@@ -29,6 +34,9 @@ public sealed class Main : IScript
         // again on every theme change, so nothing is added before the list exists.
         _plugin.Themes.Changed += Sync;
 
+        // vMenu forgets an override when it restarts, so the saved theme is put back on the next one.
+        _plugin.Disconnected += () => _restored = false;
+
         var result = await _plugin.ConnectAsync();
 
         API.Log.Info($"[ThemePicker] Registered with vMenu: {result.Accepted}.");
@@ -42,6 +50,8 @@ public sealed class Main : IScript
         {
             Rebuild(themes);
         }
+
+        Restore(themes);
 
         foreach (var theme in themes)
         {
@@ -74,7 +84,7 @@ public sealed class Main : IScript
                 var button = _plugin.RootMenu.AddButton(Text.Literal(theme.Name), id: "theme." + id);
 
                 button.Description = Text.Key("themes.pick", ("theme", Text.Literal(theme.Name)));
-                button.Selected += () => _plugin.Themes.Set(id);
+                button.Selected += () => Pick(id);
 
                 _buttons[id] = button;
                 _built.Add(id);
@@ -82,7 +92,52 @@ public sealed class Main : IScript
 
             _reset = _plugin.RootMenu.AddButton(Text.Key("themes.reset"), id: "theme.reset");
             _reset.Description = Text.Key("themes.reset.desc");
-            _reset.Selected += () => _plugin.Themes.Reset();
+            _reset.Selected += Forget;
+        }
+    }
+
+    private void Pick(string id)
+    {
+        _restored = true;
+
+        Native.SetResourceKvp(SavedThemeKey, id);
+
+        _plugin.Themes.Set(id);
+    }
+
+    private void Forget()
+    {
+        _restored = true;
+
+        Native.DeleteResourceKvp(SavedThemeKey);
+
+        _plugin.Themes.Reset();
+    }
+
+    // Once per vMenu, and only while the saved theme is one vMenu currently offers: the resource that
+    // provides it may still be starting, and then it lands on a later list.
+    private void Restore(IReadOnlyList<PluginTheme> themes)
+    {
+        if (_restored || Native.GetResourceKvpString(SavedThemeKey) is not { Length: > 0 } saved)
+        {
+            return;
+        }
+
+        foreach (var theme in themes)
+        {
+            if (!string.Equals(theme.Id, saved, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            _restored = true;
+
+            if (!theme.IsCurrent)
+            {
+                _plugin.Themes.Set(theme.Id);
+            }
+
+            return;
         }
     }
 
@@ -114,11 +169,11 @@ public sealed class Main : IScript
             ["themes.description"] = "Changes how vMenu looks, for you only.",
             ["themes.subtitle"] = "Menu Themes",
 
-            ["themes.pick"] = "Draws every vMenu menu in the {theme} theme. Only you see it, and only until you reconnect.",
+            ["themes.pick"] = "Draws every vMenu menu in the {theme} theme. Only you see it, and it is remembered for the next time you play.",
             ["themes.current"] = "Current",
 
             ["themes.reset"] = "Use the server's theme",
-            ["themes.reset.desc"] = "Puts the menus back in the theme the server picked. This row wakes up once you have chosen a theme yourself.",
+            ["themes.reset.desc"] = "Puts the menus back in the theme the server picked and forgets your choice. This row wakes up once you have chosen a theme yourself.",
         });
 
         plugin.Translations.Add("nl", new Dictionary<string, string>
@@ -127,11 +182,11 @@ public sealed class Main : IScript
             ["themes.description"] = "Verandert hoe vMenu eruitziet, alleen voor jou.",
             ["themes.subtitle"] = "Menuthema's",
 
-            ["themes.pick"] = "Tekent elk vMenu menu in het thema {theme}. Alleen jij ziet het, en alleen tot je opnieuw verbindt.",
+            ["themes.pick"] = "Tekent elk vMenu menu in het thema {theme}. Alleen jij ziet het, en het wordt onthouden voor de volgende keer.",
             ["themes.current"] = "Huidige",
 
             ["themes.reset"] = "Gebruik het thema van de server",
-            ["themes.reset.desc"] = "Zet de menu's terug in het thema dat de server heeft gekozen. Deze rij wordt wakker zodra je zelf een thema hebt gekozen.",
+            ["themes.reset.desc"] = "Zet de menu's terug in het thema dat de server heeft gekozen en vergeet je keuze. Deze rij wordt wakker zodra je zelf een thema hebt gekozen.",
         });
     }
 }

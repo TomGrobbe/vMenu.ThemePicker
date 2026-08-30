@@ -4,7 +4,7 @@ A small plugin for [vMenu Enhanced](https://github.com/TomGrobbe/vMenu) that let
 
 vMenu ships a few themes: the default soft dark glass look, a solid dark one, a bright cartoon one, and the plain GTA V style. Normally the server owner picks one for everybody with a convar. This plugin adds a Theme Picker row to vMenu's Plugins menu with a button for every theme vMenu knows about, and pressing one switches the menus over straight away.
 
-**The choice belongs to the player and to that session only.** Nothing is written to disk, so reconnecting to the server, restarting the game, or restarting the resource puts the server's own theme back. There is one more row, Use the server's theme, that does the same thing without waiting for a reconnect. It stays greyed out until you have actually picked a theme yourself, because before that there is nothing to undo.
+**The choice belongs to the player, and it is remembered.** It is saved on that player's own computer, in this resource's key value store, so their theme comes back the next time they play, and it follows them to any server running this plugin. Nothing about it reaches the server, and no other player sees it. There is one more row, Use the server's theme, which forgets the choice and puts the server's own theme back. It stays greyed out until you have actually picked a theme yourself, because before that there is nothing to undo.
 
 There are no permissions and no settings. Anyone who can open vMenu can change how their own menus look, which is the point: it changes nothing but what that one player sees.
 
@@ -33,6 +33,8 @@ _plugin.Themes.Changed += Sync;
 ```
 
 vMenu sends the theme list to a plugin right after it registers, and again every time the theme changes, whoever changed it. So the rows are built from that event rather than up front, and the Current label moves on its own when something else changes the theme, including the server owner editing the convar while you play.
+
+vMenu itself never saves a theme, that is this plugin's job. It writes the chosen id with `SetResourceKvp` and puts it back on the first theme list it gets, once per vMenu run. A saved theme that no resource provides right now is left alone rather than dropped, so a theme pack starting a moment later still lands.
 
 Picking a theme is `_plugin.Themes.Set(id)`, and going back to the server's choice is `_plugin.Themes.Reset()`.
 
