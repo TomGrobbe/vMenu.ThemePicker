@@ -11,6 +11,6 @@
 
       Themes arrived in 0.0.1-alpha.92, which is the oldest release this plugin works against.
     -->
-    <PackageVersion Include="vMenu.Enhanced.ClientAPI" Version="0.0.1-alpha.94" />
+    <PackageVersion Include="vMenu.Enhanced.ClientAPI" Version="0.0.1-alpha.98" />
   </ItemGroup>
 </Project>
